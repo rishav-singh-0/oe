@@ -1,122 +1,133 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/iancoleman/strcase"
+	omh "github.com/rishav-singh-0/oe/pkg"
 	log "github.com/sirupsen/logrus"
 	"github.com/thlib/go-timezone-local/tzlocal"
-	omh "github.com/ukautz/obsidian-meets-hugo/pkg"
-	"github.com/urfave/cli/v2"
+	cli "github.com/urfave/cli/v3"
 )
 
 func main() {
-	app := cli.NewApp()
-	app.Name = "omh"
-	app.Flags = []cli.Flag{
-		&cli.StringFlag{
-			Name:     "obsidian-root",
-			Aliases:  []string{"O"},
-			Required: true,
-			Usage:    "Path to root of Obsidian Vault",
-		},
-		&cli.StringFlag{
-			Name:     "hugo-root",
-			Aliases:  []string{"H"},
-			Required: true,
-			Usage:    "Path to root of Hugo setup",
-		},
-		&cli.StringFlag{
-			Name:    "sub-path",
-			Aliases: []string{"p"},
-			Usage:   "Sub-path used in Hugo setup below content and static",
-			Value:   "obsidian",
-		},
-		&cli.StringSliceFlag{
-			Name:    "include-tag",
-			Aliases: []string{"i"},
-			Usage:   "Tag to include (accept list - accepts all, if unset)",
-		},
-		&cli.StringSliceFlag{
-			Name:    "exclude-tag",
-			Aliases: []string{"e"},
-			Usage:   "Tag to exclude (reject list - reject none, if unset)",
-		},
-		&cli.StringSliceFlag{
-			Name:    "front-matter",
-			Aliases: []string{"F"},
-			Usage:   "Additional Front Matter, added to all generated Hugo pages, in the form `key:value`",
-		},
-		&cli.StringFlag{
-			Name:    "tags-key",
-			Aliases: []string{"t"},
-			Usage:   "Name of Front Matter attribute to use for tags (so that taxonomy in Hugo can be used)",
-			Value:   "tags",
-		},
-		&cli.BoolFlag{
-			Name:    "recursive",
-			Aliases: []string{"R"},
-			Usage:   "Whether to recurse the Obsidian Root directory (or not and then ignore sub directories..)",
-		},
-		&cli.StringFlag{
-			Name:    "time-zone",
-			Aliases: []string{"z"},
-			Usage:   "The time zone all output dates should have",
-			Value:   loadTimeZone(),
-		},
-		&cli.BoolFlag{
-			Name:    "debug",
-			Aliases: []string{"D"},
-			Usage:   "Enable debug logs",
-		},
-	}
-	app.Action = func(c *cli.Context) error {
-		if c.Bool("debug") {
-			log.SetLevel(log.DebugLevel)
-		}
-
-		recurse := c.Bool("recursive")
-		directory, err := omh.LoadObsidianDirectory(c.String("obsidian-root"), createFilter(c), recurse)
-		if err != nil {
-			return err
-		}
-
-		timeZone, err := time.LoadLocation(c.String("time-zone"))
-		if err != nil {
-			return fmt.Errorf("failed to parse time zone: %w", err)
-		}
-		omh.TimeZone = timeZone
-
-		// is there additional front matter?
-		addFrontMatter := make(map[string]interface{})
-		for _, matter := range c.StringSlice("front-matter") {
-			kv := strings.SplitN(matter, ":", 2)
-			addFrontMatter[kv[0]] = kv[1]
-		}
-
-		converter := &omh.Converter{
-			ObsidianRoot: directory,
-			HugoRoot:     c.String("hugo-root"),
-			SubPath:      c.String("sub-path"),
-			FrontMatter:  addFrontMatter,
-			ConvertName: func(name string) (link string) {
-				return omh.Sanitize(strcase.ToKebab(name))
+	cmd := &cli.Command{
+		Name:                  "oe",
+		Version:               "0.0.1",
+		Description:           "Command line tool to export Obsidian Vault to Hugo",
+		Authors:               []any{"Rishav Singh <rsh04613@gmail.com"},
+		EnableShellCompletion: true,
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:     "obsidian-root",
+				Aliases:  []string{"O"},
+				Required: true,
+				Value:    "vault",
+				Usage:    "Path to root of Obsidian Vault",
 			},
-			TagsKey: c.String("tags-key"),
-		}
+			&cli.StringFlag{
+				Name:     "hugo-root",
+				Aliases:  []string{"H"},
+				Required: true,
+				Usage:    "Path to root of Hugo setup",
+			},
+			&cli.StringFlag{
+				Name:    "sub-path",
+				Aliases: []string{"p"},
+				Usage:   "Sub-path used in Hugo setup below content and static",
+				Value:   "posts",
+			},
+			&cli.StringSliceFlag{
+				Name:    "include-tag",
+				Aliases: []string{"i"},
+				Usage:   "Tag to include (accept list - accepts all, if unset)",
+			},
+			&cli.StringSliceFlag{
+				Name:    "exclude-tag",
+				Aliases: []string{"e"},
+				Usage:   "Tag to exclude (reject list - reject none, if unset)",
+			},
+			&cli.StringSliceFlag{
+				Name:    "front-matter",
+				Aliases: []string{"F"},
+				Usage:   "Additional Front Matter, added to all generated Hugo pages, in the form `key:value`",
+			},
+			&cli.StringFlag{
+				Name:    "tags-key",
+				Aliases: []string{"t"},
+				Usage:   "Name of Front Matter attribute to use for tags (so that taxonomy in Hugo can be used)",
+				Value:   "tags",
+			},
+			&cli.BoolFlag{
+				Name:    "recursive",
+				Aliases: []string{"R"},
+				Usage:   "Whether to recurse the Obsidian Root directory (or not and then ignore sub directories..)",
+			},
+			&cli.StringFlag{
+				Name:    "time-zone",
+				Aliases: []string{"z"},
+				Usage:   "The time zone all output dates should have",
+				Value:   loadTimeZone(),
+			},
+			&cli.BoolFlag{
+				Name:    "debug",
+				Aliases: []string{"D"},
+				Usage:   "Enable debug logs",
+			},
+		},
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			for i, v := range cmd.FlagNames() {
+				fmt.Printf("%d-%s %#v\n", i, v, cmd.Value(v))
+			}
 
-		return converter.Run()
+			if cmd.Bool("debug") {
+				log.SetLevel(log.DebugLevel)
+			}
+
+			recurse := cmd.Bool("recursive")
+			directory, err := omh.LoadObsidianDirectory(cmd.String("obsidian-root"), createFilter(cmd), recurse)
+			if err != nil {
+				return err
+			}
+
+			timeZone, err := time.LoadLocation(cmd.String("time-zone"))
+			if err != nil {
+				return fmt.Errorf("failed to parse time zone: %w", err)
+			}
+			omh.TimeZone = timeZone
+
+			// is there additional front matter?
+			addFrontMatter := make(map[string]interface{})
+			for _, matter := range cmd.StringSlice("front-matter") {
+				kv := strings.SplitN(matter, ":", 2)
+				addFrontMatter[kv[0]] = kv[1]
+			}
+
+			converter := &omh.Converter{
+				ObsidianRoot: directory,
+				HugoRoot:     cmd.String("hugo-root"),
+				SubPath:      cmd.String("sub-path"),
+				FrontMatter:  addFrontMatter,
+				ConvertName: func(name string) (link string) {
+					return omh.Sanitize(strcase.ToKebab(name))
+				},
+				TagsKey: cmd.String("tags-key"),
+			}
+
+			return converter.Run()
+		},
+		Arguments: cli.AnyArguments,
 	}
-
-	if err := app.Run(os.Args); err != nil {
+	if err := cmd.Run(context.Background(), os.Args); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func createFilter(c *cli.Context) omh.ObsidianFilter {
+func createFilter(c *cli.Command) omh.ObsidianFilter {
 	filters := make([]omh.ObsidianFilter, 0)
 	if includes := c.StringSlice("include-tag"); len(includes) > 0 {
 		included := strsToBoolMap(includes)
