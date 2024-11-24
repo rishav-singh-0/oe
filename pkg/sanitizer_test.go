@@ -3,8 +3,8 @@ package omh_test
 import (
 	"testing"
 
+	omh "github.com/rishav-singh-0/oe/pkg"
 	"github.com/stretchr/testify/assert"
-	omh "github.com/ukautz/obsidian-meets-hugo/pkg"
 )
 
 func TestSanitize(t *testing.T) {

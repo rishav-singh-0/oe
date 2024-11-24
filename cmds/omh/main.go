@@ -16,10 +16,10 @@ import (
 
 func main() {
 	cmd := &cli.Command{
-		Name:                  "oe",
+		Name:                  "omh",
 		Version:               "0.0.1",
 		Description:           "Command line tool to export Obsidian Vault to Hugo",
-		Authors:               []any{"Rishav Singh <rsh04613@gmail.com"},
+		Authors:               []any{"Rishav Singh <rsh04613@gmail.com>"},
 		EnableShellCompletion: true,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
@@ -52,6 +52,11 @@ func main() {
 				Usage:   "Tag to exclude (reject list - reject none, if unset)",
 			},
 			&cli.StringSliceFlag{
+				Name:    "publish-field",
+				Aliases: []string{"P"},
+				Usage:   "Only include Field/Frontmatter (include all if unset)",
+			},
+			&cli.StringSliceFlag{
 				Name:    "front-matter",
 				Aliases: []string{"F"},
 				Usage:   "Additional Front Matter, added to all generated Hugo pages, in the form `key:value`",
@@ -80,18 +85,13 @@ func main() {
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			for i, v := range cmd.FlagNames() {
-				fmt.Printf("%d-%s %#v\n", i, v, cmd.Value(v))
-			}
 
 			if cmd.Bool("debug") {
 				log.SetLevel(log.DebugLevel)
-			}
-
-			recurse := cmd.Bool("recursive")
-			directory, err := omh.LoadObsidianDirectory(cmd.String("obsidian-root"), createFilter(cmd), recurse)
-			if err != nil {
-				return err
+				// Print all arguments
+				for i, v := range cmd.FlagNames() {
+					fmt.Printf("%d-%s %#v\n", i, v, cmd.Value(v))
+				}
 			}
 
 			timeZone, err := time.LoadLocation(cmd.String("time-zone"))
@@ -99,6 +99,12 @@ func main() {
 				return fmt.Errorf("failed to parse time zone: %w", err)
 			}
 			omh.TimeZone = timeZone
+
+			recurse := cmd.Bool("recursive")
+			directory, err := omh.LoadObsidianDirectory(cmd.String("obsidian-root"), createFilter(cmd), recurse)
+			if err != nil {
+				return err
+			}
 
 			// is there additional front matter?
 			addFrontMatter := make(map[string]interface{})
@@ -129,11 +135,30 @@ func main() {
 
 func createFilter(c *cli.Command) omh.ObsidianFilter {
 	filters := make([]omh.ObsidianFilter, 0)
+
+	// Filter notes to include only those with tags matching the "include-tag" list
 	if includes := c.StringSlice("include-tag"); len(includes) > 0 {
+		// Convert the list of included tags into a map for quick lookup
 		included := strsToBoolMap(includes)
+
+		// Append the filter that checks if any tag in the note matches the included tags
 		filters = append(filters, func(note omh.ObsidianNote) bool {
+			// Iterate over each tag in the note's front matter
 			for _, tag := range note.FrontMatter.Strings("tags") {
+				// If the tag exists in the included map, keep the note
 				if included[tag] {
+					return true
+				}
+			}
+			// Exclude the note if none of its tags match the included list
+			return false
+		})
+	}
+
+	if fields := c.StringSlice("publish-field"); len(fields) > 0 {
+		filters = append(filters, func(note omh.ObsidianNote) bool {
+			for _, field := range fields {
+				if note.FrontMatter.Has(field) {
 					return true
 				}
 			}
@@ -141,14 +166,21 @@ func createFilter(c *cli.Command) omh.ObsidianFilter {
 		})
 	}
 
+	// Filter notes to exclude those with tags matching the "exclude-tag" list
 	if excludes := c.StringSlice("exclude-tag"); len(excludes) > 0 {
+		// Convert the list of excluded tags into a map for quick lookup
+		excluded := strsToBoolMap(excludes)
+
+		// Append the filter that checks if any tag in the note matches the excluded tags
 		filters = append(filters, func(note omh.ObsidianNote) bool {
-			excluded := strsToBoolMap(excludes)
+			// Iterate over each tag in the note's front matter
 			for _, tag := range note.FrontMatter.Strings("tags") {
+				// If the tag exists in the excluded map, discard the note
 				if excluded[tag] {
 					return false
 				}
 			}
+			// Keep the note if none of its tags match the excluded list
 			return true
 		})
 	}

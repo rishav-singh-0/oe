@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
+	omh "github.com/rishav-singh-0/oe/pkg"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	omh "github.com/ukautz/obsidian-meets-hugo/pkg"
 )
 
 func TestFrontMatter_Has(t *testing.T) {
