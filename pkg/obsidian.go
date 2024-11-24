@@ -3,7 +3,7 @@ package omh
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -88,7 +88,7 @@ func (note ObsidianNote) extractDate() (*time.Time, error) {
 
 // LoadObsidianNote loads an Obsidian note from disk at given path
 func LoadObsidianNote(path string) (ObsidianNote, error) {
-	raw, err := ioutil.ReadFile(path)
+	raw, err := os.ReadFile(path)
 	if err != nil {
 		return ObsidianNote{}, err
 	}
@@ -148,7 +148,7 @@ func (directory ObsidianDirectory) linkMap(convert ConvertName, to map[string]st
 
 // LoadObsidianDirectory reads all notes and sub-directories within a directory in an Obsidian vault
 func LoadObsidianDirectory(path string, filter ObsidianFilter, recurse bool) (root ObsidianDirectory, err error) {
-	fis, err := ioutil.ReadDir(path)
+	fis, err := os.ReadDir(path)
 	if err != nil {
 		return
 	}

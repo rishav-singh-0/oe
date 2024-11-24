@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -127,7 +126,7 @@ func (c Converter) processNotes(obsidianDir ObsidianDirectory, hugoDir string) e
 		}
 
 		hugoPath := filepath.Join(hugoDir, c.ConvertName(note.Title)) + ".md"
-		err = ioutil.WriteFile(hugoPath, hugoContent, 0644)
+		err = os.WriteFile(hugoPath, hugoContent, 0644)
 		if err != nil {
 			return fmt.Errorf("failed to write %s: %w", hugoPath, err)
 		}

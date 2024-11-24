@@ -1,7 +1,6 @@
 package omh_test
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -43,7 +42,7 @@ func TestConverter_Run(t *testing.T) {
 func loadDir(t *testing.T, path string) map[string]string {
 
 	files := make(map[string]string)
-	fhs, err := ioutil.ReadDir(path)
+	fhs, err := os.ReadDir(path)
 	if err != nil {
 		t.Fatalf("failed read dir %s: %s", path, err)
 	}
@@ -56,7 +55,7 @@ func loadDir(t *testing.T, path string) map[string]string {
 				files[file] = content
 			}
 		} else {
-			raw, err := ioutil.ReadFile(fp)
+			raw, err := os.ReadFile(fp)
 			if err != nil {
 				t.Fatalf("failed to read file %s: %s", fp, err)
 			}
